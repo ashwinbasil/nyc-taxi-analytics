@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: nyc-taxi-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: nyc_taxi
+      MYSQL_USER: taxi_user
+      MYSQL_PASSWORD: taxi_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./sql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./sql/materialized_views.sql:/docker-entrypoint-initdb.d/02-views.sql
+    networks:
+      - nyc-taxi-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: nyc-taxi-phpmyadmin
+    environment:
+      PMA_HOST: mysql
+      PMA_USER: root
+      PMA_PASSWORD: root_password
+    ports:
+      - "8080:80"
+    depends_on:
+      - mysql
+    networks:
+      - nyc-taxi-network
+
+volumes:
+  mysql_data:
+
+networks:
+  nyc-taxi-network:
+    driver: bridge
