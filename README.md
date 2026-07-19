@@ -1,312 +1,237 @@
-# NYC Taxi Analytics System
+# NYC Taxi Analytics
 
-End-to-end SQL + Dashboard system with real NYC Taxi dataset (100M+ rows). Demonstrates operational analytics, automated data pipelines, and business insights through Tableau dashboards.
+End-to-end data analytics pipeline using the NYC TLC Yellow Taxi dataset (January 2024, ~2.7M rows). Built with Python, DuckDB, MySQL, and Tableau Public.
 
-## 📊 System Architecture
-
-```
-DuckDB/CSV (NYC Taxi Data)
-          ↓
-     Data Pipeline (Python)
-          ↓
-    MySQL Database
-          ↓
-   Materialized Views
-   (Aggregated Tables)
-          ↓
-   Tableau Dashboard
-```
-
-## 🚀 Quick Start
-
-### Prerequisites
-- Docker & Docker Compose
-- Python 3.9+
-- MySQL 8.0+
-- Tableau Desktop/Server or Tableau Public (free)
-- DuckDB (auto-installed via pip)
-
-### 1. Spin up MySQL
-
-```bash
-docker-compose up -d mysql
-```
-
-Verify connection:
-```bash
-mysql -h 127.0.0.1 -u root -proot_password
-```
-
-### 2. Load NYC Taxi Data
-
-```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Download & ingest data (first run: ~5-10 mins)
-python scripts/data_pipeline.py --mode full
-
-# Subsequent incremental runs
-python scripts/data_pipeline.py --mode incremental
-```
-
-### 3. Create Analytics Views
-
-```bash
-mysql -h 127.0.0.1 -u root -proot_password < sql/schema.sql
-mysql -h 127.0.0.1 -u root -proot_password < sql/materialized_views.sql
-```
-
-### 4. Connect Tableau
-
-- **Data Source**: MySQL (localhost:3306)
-- **Database**: `nyc_taxi`
-- **Suggested Tables**: 
-  - `daily_zone_metrics` (pre-aggregated)
-  - `hourly_trends` (time-series)
-  - `trips` (raw data for drill-down)
+The project covers real-world data ingestion, SQL transformation, aggregated view creation, CSV export, and interactive dashboard delivery — from raw parquet files to published visualisations.
 
 ---
 
-## 📁 Project Structure
+## Stack
+
+| Layer | Tool |
+|---|---|
+| Raw data | NYC TLC Yellow Taxi parquet (Jan 2024) |
+| Extraction | DuckDB (reads parquet over HTTP) |
+| Storage | MySQL 8.0 (via Docker) |
+| Transformation | SQL views inside MySQL |
+| Export | Python + pandas |
+| Dashboards | Tableau Public 2026.2 |
+| Version control | Git + GitHub |
+| Environment | Windows, Git Bash, Python 3.14 |
+
+---
+
+## Project Structure
 
 ```
-.
-├── README.md
-├── docker-compose.yml           # MySQL + phpmyadmin setup
-├── requirements.txt             # Python dependencies
-├── sql/
-│   ├── schema.sql               # Base tables
-│   ├── materialized_views.sql   # Aggregated tables for dashboards
-│   └── analytics_queries.sql    # Business queries (examples)
+nyc-taxi-analytics/
 ├── scripts/
-│   ├── data_pipeline.py         # Main ETL script
-│   ├── config.py                # Database config
-│   └── scheduler.sh             # Cron automation setup
-├── tableau/
-│   ├── dashboard_specs.md       # Dashboard design specs
-│   └── sample_queries.sql       # Pre-built queries for Tableau
-├── .env.example                 # Environment variables template
-└── docs/
-    ├── DEPLOYMENT.md            # Production deployment guide
-    ├── TROUBLESHOOTING.md       # Common issues & fixes
-    └── DATA_DICTIONARY.md       # Schema documentation
+│   ├── data_pipeline.py      # Main ETL: extract → transform → load → views
+│   ├── export_csv.py         # Exports MySQL views to CSV for Tableau
+│   └── config.py             # Reads .env config (if separated)
+├── sql/
+│   ├── schema.sql            # trips table DDL
+│   └── views.sql             # All 5 aggregated views
+├── data/
+│   └── exports/              # Generated CSVs (gitignored)
+├── dashboards/               # Tableau .twbx files
+├── docker-compose.yml        # MySQL 8.0 container
+├── requirements.txt          # Python dependencies
+├── .env.example              # Environment variable template
+├── .gitignore
+└── README.md
 ```
 
 ---
 
-## 💡 Business Insights (Sample Queries)
+## Dataset
 
-### 1. Revenue by Zone & Time
-```sql
-SELECT 
-    zone,
-    DATE(pickup_datetime) as date,
-    HOUR(pickup_datetime) as hour,
-    COUNT(*) as trips,
-    AVG(fare_amount) as avg_fare,
-    SUM(total_amount) as total_revenue
-FROM trips
-WHERE DATE(pickup_datetime) >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-GROUP BY zone, DATE(pickup_datetime), HOUR(pickup_datetime)
-ORDER BY total_revenue DESC;
-```
+**Source:** NYC Taxi and Limousine Commission (TLC)
+**File:** `yellow_tripdata_2024-01.parquet`
+**URL:** https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2024-01.parquet
+**Rows:** ~2.7 million trips
+**Period:** January 2024
 
-### 2. Tip Analysis by Payment Type
-```sql
-SELECT 
-    payment_type,
-    COUNT(*) as transactions,
-    AVG(tip_amount) as avg_tip,
-    ROUND(AVG(tip_amount) / AVG(fare_amount) * 100, 2) as tip_percentage,
-    MAX(tip_amount) as max_tip
-FROM trips
-GROUP BY payment_type
-ORDER BY avg_tip DESC;
-```
-
-### 3. Peak Hours & Volume Trends
-```sql
-SELECT 
-    HOUR(pickup_datetime) as hour,
-    COUNT(*) as trip_volume,
-    AVG(trip_duration_minutes) as avg_duration,
-    AVG(fare_amount) as avg_fare,
-    AVG(tip_amount) as avg_tip
-FROM trips
-GROUP BY HOUR(pickup_datetime)
-ORDER BY hour;
-```
-
-### 4. Driver Efficiency (Trip Duration Analysis)
-```sql
-SELECT 
-    pickup_zone,
-    dropoff_zone,
-    COUNT(*) as route_frequency,
-    AVG(trip_duration_minutes) as avg_duration,
-    AVG(fare_amount) as avg_fare,
-    ROUND(AVG(fare_amount) / AVG(trip_duration_minutes), 2) as revenue_per_minute
-FROM trips
-WHERE trip_duration_minutes BETWEEN 5 AND 120
-GROUP BY pickup_zone, dropoff_zone
-HAVING COUNT(*) > 100
-ORDER BY revenue_per_minute DESC
-LIMIT 20;
-```
-
-### 5. Data Quality Monitoring
-```sql
-SELECT 
-    DATE(pickup_datetime) as date,
-    COUNT(*) as total_records,
-    COUNT(DISTINCT pickup_zone) as unique_zones,
-    SUM(CASE WHEN fare_amount < 0 THEN 1 ELSE 0 END) as invalid_fares,
-    SUM(CASE WHEN tip_amount < 0 THEN 1 ELSE 0 END) as invalid_tips,
-    SUM(CASE WHEN trip_duration_minutes <= 0 THEN 1 ELSE 0 END) as invalid_duration
-FROM trips
-GROUP BY DATE(pickup_datetime)
-ORDER BY date DESC;
-```
+The pipeline filters out invalid rows: zero fares, zero distance, zero passengers, and trips outside the 1–300 minute duration range.
 
 ---
 
-## 📊 Dashboard Specs (Tableau)
+## Quickstart
 
-### Dashboard 1: Daily Operations
-- **KPIs**: Total trips, Revenue, Avg Fare, Avg Tip %
-- **Charts**: 
-  - Line chart: Daily trip volume (last 30 days)
-  - Bar chart: Revenue by zone
-  - Scatter: Fare vs. Trip Duration
+### 1. Prerequisites
 
-### Dashboard 2: Zone Performance
-- **Map**: Trip count heatmap by pickup zone
-- **Table**: Top 10 zones by revenue
-- **Filter**: Date range, Zone, Payment type
+- Python 3.9+
+- Docker Desktop (must be running)
+- Git Bash (Windows)
 
-### Dashboard 3: Peak Hours Analysis
-- **Heatmap**: Trip volume by hour × day of week
-- **Line**: Revenue trend (hourly)
-- **Bar**: Avg fare & tip by hour
+### 2. Clone the repo
 
-### Dashboard 4: Payment Trends
-- **Pie**: Payment type distribution
-- **Bar**: Tip % by payment type
-- **Trend**: Monthly payment method shifts
-
----
-
-## 🔄 Automation & Scheduling
-
-### Local Development (Manual Refresh)
 ```bash
-# One-time full load
-python scripts/data_pipeline.py --mode full
-
-# Daily incremental run
-python scripts/data_pipeline.py --mode incremental
+git clone https://github.com/ashwinbasil/nyc-taxi-analytics.git
+cd nyc-taxi-analytics
 ```
 
-### Production (Automated Cron)
-```bash
-# Edit crontab
-crontab -e
+### 3. Configure environment
 
-# Add scheduled job (daily at 2 AM)
-0 2 * * * cd /path/to/nyc-taxi-analytics && python scripts/data_pipeline.py --mode incremental >> logs/pipeline.log 2>&1
+```bash
+cp .env.example .env
 ```
 
-### Docker Compose Full Stack
-```bash
-docker-compose up -d
+Edit `.env` and set your MySQL credentials:
+
 ```
-
----
-
-## 🗄️ Data Pipeline Details
-
-### Source Data
-- **NYC Taxi Dataset** (BigQuery public dataset)
-- **Format**: Parquet files from DuckDB
-- **Frequency**: Daily updates (production)
-- **Volume**: 100M+ historical rows, ~50K new rows/day
-
-### ETL Steps
-1. **Extract**: Query BigQuery or download from DuckDB
-2. **Transform**: 
-   - Parse timestamps
-   - Calculate trip duration
-   - Validate data ranges
-   - Handle nulls & outliers
-3. **Load**: Batch insert into MySQL
-4. **Aggregate**: Refresh materialized views
-
-### Performance Optimizations
-- ✅ Indexes on `pickup_datetime`, `zone`, `payment_type`
-- ✅ Partitioning by date (for large tables)
-- ✅ Pre-aggregated tables for dashboard queries
-- ✅ Connection pooling (MySQL)
-
----
-
-## 🔧 Configuration
-
-Edit `.env` to customize:
-```bash
-# MySQL
-MYSQL_HOST=localhost
+MYSQL_HOST=127.0.0.1
 MYSQL_PORT=3306
 MYSQL_USER=root
 MYSQL_PASSWORD=root_password
 MYSQL_DATABASE=nyc_taxi
+BATCH_SIZE=5000
+```
 
-# Data Pipeline
-BATCH_SIZE=10000
-MAX_WORKERS=4
-LOG_LEVEL=INFO
+### 4. Start MySQL
 
-# NYC Taxi Data (BigQuery)
-BIGQUERY_PROJECT=bigquery-public-data
-BIGQUERY_DATASET=new_york_taxi
+```bash
+docker-compose up -d
+```
+
+Wait 20 seconds, then verify:
+
+```bash
+docker ps
+```
+
+### 5. Install Python dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 6. Run the pipeline
+
+```bash
+cd scripts
+python data_pipeline.py --mode full --month 2024-01
+```
+
+This downloads the parquet file, cleans the data, loads 2.7M rows into MySQL, and builds all five views. Takes roughly 2 minutes.
+
+### 7. Export CSVs for Tableau
+
+```bash
+python export_csv.py
+```
+
+Exports all views to `data/exports/`. These are gitignored since they are generated files.
+
+---
+
+## Pipeline Modes
+
+```bash
+# Full load: truncates and reloads
+python data_pipeline.py --mode full --month 2024-01
+
+# Incremental: appends new month
+python data_pipeline.py --mode incremental --month 2024-02
 ```
 
 ---
 
-## 📈 Expected Outcomes
+## MySQL Views
 
-After setup, you'll have:
+Five aggregated views are created automatically at the end of the pipeline run. These are what Tableau connects to via the exported CSVs.
 
-✅ **100M+ rows** of NYC Taxi data in MySQL  
-✅ **5 Tableau dashboards** with interactive drill-downs  
-✅ **Automated daily pipeline** refreshing data  
-✅ **Pre-built SQL queries** for common business questions  
-✅ **Production-ready setup** with logging & monitoring  
+| View | Description |
+|---|---|
+| `daily_revenue` | Revenue, trips, avg fare, and tip rate per day |
+| `hourly_patterns` | Trip volume and revenue by hour and day of week |
+| `zone_summary` | Trip count, avg fare, avg distance, tip rate by pickup zone |
+| `payment_split` | Trip count and revenue split by payment method |
+| `anomalies` | Trips with z-score > 3 vs their pickup zone average |
+
+### Anomaly detection logic
+
+MySQL does not support `QUALIFY`, so anomaly detection uses a subquery join pattern:
+
+```sql
+SELECT t.*, 
+    ROUND(ABS(t.total_amount - z.avg_fare) / NULLIF(z.stddev_fare, 0), 2) AS z_score
+FROM trips t
+JOIN (
+    SELECT pickup_location_id,
+           AVG(total_amount)    AS avg_fare,
+           STDDEV(total_amount) AS stddev_fare
+    FROM trips
+    GROUP BY pickup_location_id
+) z ON t.pickup_location_id = z.pickup_location_id
+WHERE ABS(t.total_amount - z.avg_fare) / NULLIF(z.stddev_fare, 0) > 3
+ORDER BY z_score DESC
+LIMIT 1000;
+```
 
 ---
 
-## 🐛 Troubleshooting
+## Dashboards
 
-See [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for:
-- MySQL connection issues
-- Data pipeline failures
-- Tableau connection problems
-- Performance optimization
+Built in Tableau Public 2026.2 using the exported CSVs as data sources.
 
----
+Five sheets:
 
-## 📚 Additional Resources
-
-- [NYC Taxi Dataset Docs](https://cloud.google.com/bigquery/public-data/nyc-tlc-trips)
-- [MySQL Best Practices](docs/DEPLOYMENT.md)
-- [Tableau Connection Guide](tableau/dashboard_specs.md)
-- [Data Dictionary](docs/DATA_DICTIONARY.md)
+- **Daily Revenue** — line chart with trip volume overlay
+- **Hourly Heatmap** — busiest hours by day of week
+- **Zone Performance** — top pickup zones by trips and avg fare
+- **Payment Split** — cash vs card vs app breakdown
+- **Anomaly Table** — flagged suspicious trips sorted by z-score
 
 ---
 
-## 📝 License
+## Key Learnings
 
-MIT License - Use for learning & demonstration purposes.
+- `DATEDIFF` is MySQL syntax. DuckDB uses `date_diff('minute', ...)`.
+- `DATE_ADD(..., INTERVAL 1 MONTH)` is MySQL syntax. In DuckDB, compute the next month in Python and pass it as a plain string.
+- MySQL has no `QUALIFY`. Window function filtering requires a subquery join.
+- Tableau Public (free) does not support live database connections. Export to CSV first.
+- The MySQL CLI with `sed` on Windows Git Bash produces malformed CSV headers. Use `pandas.read_sql` via Python instead.
+- Schema changes require dropping the table first. Stale schemas with missing columns cause silent failures on insert.
+- Docker Desktop must be running before any MySQL connection attempt. The daemon does not start automatically on Windows.
 
-**Last Updated**: June 2026  
-**Author**: ashwinbasil
+---
+
+## Requirements
+
+```
+duckdb
+pandas
+mysql-connector-python
+sqlalchemy
+pymysql
+python-dotenv
+```
+
+Install:
+
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+## Gitignore
+
+```
+data/
+*.parquet
+*.duckdb
+data/exports/
+.env
+__pycache__/
+pipeline.log
+```
+
+Raw data, exports, and credentials are never committed.
+
+---
+
+## License
+
+MIT
