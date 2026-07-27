@@ -206,7 +206,7 @@ Five sheets published to Tableau Public:
 | Payment Split | Revenue and trip share by payment method |
 | Anomaly Explorer | Flagged trips sorted by z-score with zone and fare details |
 
-**Live dashboard:**https://public.tableau.com/app/profile/ashwin.basil.jacob/viz/nyc-taxi-analytics/Dashboard1?publish=yes
+**Live dashboard:** https://public.tableau.com/app/profile/ashwin.basil.jacob/viz/nyc-taxi-analytics/Dashboard1?publish=yes
 
 ---
 
