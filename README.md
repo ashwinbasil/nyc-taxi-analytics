@@ -1,6 +1,6 @@
 # NYC Taxi Analytics Pipeline
 
-A production-style analytics pipeline built on 2.7 million real taxi trips from January 2024. The pipeline ingests raw parquet data, models it in MySQL, and delivers five operational dashboards in Tableau answering concrete business questions about revenue, demand, and fare anomalies.
+A production-style analytics pipeline built on 5.4 million real taxi trips from January–February 2024. The pipeline ingests raw parquet data, models it in MySQL, and delivers five operational dashboards in Tableau answering concrete business questions about revenue, demand, and fare anomalies.
 
 ---
 
@@ -18,7 +18,7 @@ This pipeline answers all three using a month of real TLC data.
 
 ## Key findings
 
-> These are derived from January 2024 yellow taxi data, ~2.7M trips after cleaning.
+> These are derived from January 2024 yellow taxi data, ~5.4M trips after cleaning.
 
 - **Peak revenue window is 6pm–10pm on weekdays**, accounting for the highest trip density and average fare combined
 - **Airport zones (JFK: 132, LaGuardia: 138) generate the highest average fares** — roughly 2x the Manhattan average — but represent a smaller share of total volume
@@ -52,7 +52,7 @@ NYC TLC S3 (parquet)
 ```
 
 **Why this stack:**
-- DuckDB reads 2.7M rows from a remote parquet file in under 10 seconds without downloading it first
+- DuckDB reads 5.4M rows from a remote parquet file in under 10 seconds without downloading it first
 - MySQL handles the aggregation layer via views so Tableau queries pre-computed results, not raw rows
 - CSV export is required because Tableau Public does not support live database connections
 
@@ -123,7 +123,7 @@ cd scripts
 python data_pipeline.py --mode full --month 2024-01
 ```
 
-Downloads the parquet file, cleans data, loads 2.7M rows into MySQL, and builds all five views. Runs in roughly 2 minutes.
+Downloads the parquet file, cleans data, loads 5.4M rows into MySQL, and builds all five views. Runs in roughly 2 minutes per month.
 
 ### Export to Tableau
 
@@ -151,7 +151,7 @@ python data_pipeline.py --mode incremental --month 2024-02
 
 **Source table: `trips`**
 
-~2.7M rows after filtering. Excludes zero-fare, zero-distance, zero-passenger, and duration outlier trips (under 1 min or over 300 min).
+~5.4M rows after filtering. Excludes zero-fare, zero-distance, zero-passenger, and duration outlier trips (under 1 min or over 300 min).
 
 **Aggregated views:**
 
